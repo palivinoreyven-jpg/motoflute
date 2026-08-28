@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store POS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { border: none; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+    <div class="container-fluid px-4">
+        <span class="navbar-brand fw-bold">
+            <i class="fa-solid fa-cart-shopping me-2 text-success"></i>Store POS
+        </span>
+        
+        <div class="d-flex align-items-center ms-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light btn-sm me-2 fw-bold">
+                <i class="fa-solid fa-gauge me-1"></i> Dashboard
+            </a>
+            <a href="{{ url_for('inventory') }}" class="btn btn-outline-light btn-sm me-3 fw-bold">
+                <i class="fa-solid fa-boxes-stacked me-1"></i> Inventory
+            </a>
+            {% if session.get('user') %}
+                <span class="text-light me-2"><i class="fa-solid fa-user me-1 text-info"></i>{{ session.get('user') }}</span>
+                <span class="badge bg-primary text-uppercase me-3">{{ role or 'Staff' }}</span>
+            {% endif %}
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm fw-bold">
+                <i class="fa-solid fa-right-from-bracket me-1"></i> Log Out
+            </a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 mb-5">
+    <div class="row g-4">
+        
+        <!-- Product Catalog Grid -->
+        <div class="col-lg-7 col-xl-8">
+            <h4 class="fw-bold mb-3"><i class="fa-solid fa-store me-2 text-primary"></i>Available Products</h4>
+            <div class="row g-3">
+                {% for item in items %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="card h-100 p-3">
+                        <span class="badge bg-light text-dark border align-self-start mb-2">{{ item.get('category', 'General') if item is mapping else item['category'] }}</span>
+                        <h5 class="fw-bold mb-1 text-truncate">{{ item.get('name', 'Unnamed Item') if item is mapping else item['name'] }}</h5>
+                        <div class="text-success fw-bold mb-2">
+                            ₱{{ "%.2f"|format((item.get('price') or 0)|float if item is mapping else (item['price'] or 0)|float) }}
+                        </div>
+                        <small class="text-muted mb-3">Available Stock: {{ item.get('quantity', 0) if item is mapping else item['quantity'] }}</small>
+                        
+                        <form action="{{ url_for('add_to_cart', product_id=item.get('id') if item is mapping else item['id']) }}" method="POST" class="mt-auto">
+                            <div class="input-group input-group-sm">
+                                <input type="number" name="quantity" class="form-control" value="1" min="1" max="{{ item.get('quantity', 1) if item is mapping else item['quantity'] }}" required>
+                                <button type="submit" class="btn btn-success fw-bold">
+                                    <i class="fa-solid fa-cart-plus me-1"></i> Add
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12">
+                    <div class="alert alert-info text-center">No products currently available for sale.</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Checkout Cart Sidebar -->
+        <div class="col-lg-5 col-xl-4">
+            <div class="card p-3 sticky-top" style="top: 20px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0"><i class="fa-solid fa-basket-shopping me-2 text-success"></i>Current Cart</h5>
+                    {% if cart %}
+                        <a href="{{ url_for('clear_cart') }}" class="btn btn-outline-danger btn-sm">Clear Cart</a>
+                    {% endif %}
+                </div>
+
+                {% if cart %}
+                    <ul class="list-group mb-3">
+                        {% for item in cart %}
+                        {% set item_qty = (item.get('qty', 1) or 1)|int if item is mapping else (item['qty'] or 1)|int %}
+                        {% set item_price = (item.get('price', 0) or 0)|float if item is mapping else (item['price'] or 0)|float %}
+                        {% set subtotal = item_qty * item_price %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">{{ item.get('name', 'Item') if item is mapping else item['name'] }}</div>
+                                <small class="text-muted">{{ item_qty }} x ₱{{ "%.2f"|format(item_price) }}</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold text-success">₱{{ "%.2f"|format(subtotal) }}</span>
+                                <a href="{{ url_for('remove_from_cart', item_index=loop.index0) }}" class="text-danger"><i class="fa-solid fa-circle-xmark"></i></a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <form action="{{ url_for('checkout') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Customer Name</label>
+                            <input type="text" name="customer_name" class="form-control" placeholder="Optional (Default: Guest)">
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                            <i class="fa-solid fa-credit-card me-1"></i> Complete Checkout
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="text-center text-muted py-4">Cart is currently empty.</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
