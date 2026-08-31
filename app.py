@@ -1,3 +1,4 @@
+import os
 import calendar
 import random
 import smtplib
@@ -10,16 +11,26 @@ from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'motoflute_web_secret_key'
 
-# Database Configuration
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Adminven1!'
-app.config['MYSQL_DB'] = 'inventory_db'
+# Fallback session secret key for safety
+app.secret_key = os.environ.get('SECRET_KEY', 'motoflute_web_secret_key')
+
+# --- Secure Database Configuration (TiDB Cloud Compatible) ---
+# When deployed to Render, it pulls from environment variables.
+# On your local computer, it defaults to your local MySQL settings.
+app.config['MYSQL_HOST'] = os.environ.get('DB_HOST', 'localhost')
+app.config['MYSQL_USER'] = os.environ.get('DB_USER', 'root')
+app.config['MYSQL_PASSWORD'] = os.environ.get('DB_PASSWORD', 'Adminven1!')
+app.config['MYSQL_DB'] = os.environ.get('DB_NAME', 'inventory_db')
+app.config['MYSQL_PORT'] = int(os.environ.get('DB_PORT', 3306))  # TiDB will use 4000
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
-# SMTP / Email Configuration
+# Critical Configuration: TiDB Cloud Serverless requires SSL connections.
+# This flag enables safe TLS transport over the web.
+if os.environ.get('DB_HOST') and 'tidbcloud.com' in os.environ.get('DB_HOST'):
+    app.config['MYSQL_SSL'] = {'ssl': {}}
+
+# --- SMTP / Email Configuration ---
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
@@ -47,10 +58,9 @@ def send_email(to_email, subject, body):
         print(f"--> Failed to send email: {e}")
         return False
 
-
 # 1. Main Dashboard Route (Hub with Analytics, Product Updates & Recent Transactions)
 # 1. Main Dashboard Route (Hub with Analytics, Product Updates & Recent Transactions)
-@app.route('/dashboard')
+@app.route('/')
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
